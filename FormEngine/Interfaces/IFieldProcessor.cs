@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -14,7 +15,6 @@ public interface IFieldContext
 {
     Field CurrentField { get; }
     IServiceResolver ServiceResolver { get; }
-    // PropertyInfo PropInfo { get; }
 }
 
 public interface IFieldProcessor

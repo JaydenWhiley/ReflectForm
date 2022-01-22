@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using FormEngine.Interfaces;
+using FormEngine.Services;
 
 namespace FormEngine;
 
@@ -20,10 +22,11 @@ public class DefaultMetaFieldGeneration : IMetaFieldGenerator
 {
     public IEnumerable<MetaField> GetMetaFields(PropertyInfo propInfo, FormGenerationContext context)
     {
+        var extractedProcessors = context.AttributeExtractor.GetAttributeServices<IFieldProcessor>(propInfo);
         return new[]{
                 new MetaField(){
                     PropInfo = propInfo,
-                    Processors = propInfo.GetAttributesByInterface<IFieldProcessor>().Concat(context.Processors)
+                    Processors = extractedProcessors.Concat(context.Processors)
                 }
             };
     }
@@ -116,8 +119,8 @@ public class FormGenerationContext
     public IMetaFieldGenerator MetaGenerator { get; set; }
     public IFieldConverter FieldConverter { get; set; }
     public IEnumerable<IFieldProcessor> Processors { get; set; }
+    public IAttributeService AttributeExtractor { get; set; }
     public IServiceResolver ServiceResolver { get; set; }
-
     public FormGenerationContext ParentContext { get; set; }
 }
 
@@ -139,6 +142,7 @@ public static class FormGenerationExtensions
         return new FormGenerationContext()
         {
             ServiceResolver = context.ServiceResolver,
+            AttributeExtractor = context.AttributeExtractor,
             MetaGenerator = context.MetaGenerator,
             FieldConverter = context.FieldConverter,
             Processors = context.Processors.ToArray(),
@@ -151,9 +155,10 @@ public static class FormGenerationExtensions
         return new FormGenerationContext()
         {
             ServiceResolver = context.ServiceResolver,
+            AttributeExtractor = context.AttributeExtractor,
             MetaGenerator = info.GetAttributeByInterface<IMetaFieldGenerator>() ?? context.MetaGenerator,
             FieldConverter = info.GetAttributeByInterface<IFieldConverter>() ?? context.FieldConverter,
-            Processors = context.Processors.Concat(info.GetAttributesByInterface<IFieldProcessor>()),
+            Processors = context.Processors.Concat(context.AttributeExtractor.GetAttributeServices<IFieldProcessor>(info)),
             ParentContext = context
         };
     }
@@ -164,12 +169,19 @@ public class FormEngineInstance
     protected IMetaFieldGenerator DefaultMetaFieldGenerator { get; set; }
     protected IFieldConverter DefaultFieldConverter { get; set; }
     protected IServiceResolver DefaultServiceResolver { get; set; }
+    protected IAttributeService DefaultAttributeExtractor { get; set; }
 
     public FormEngineInstance()
     {
         this.DefaultFieldConverter = new DefaultFieldConversion();
         this.DefaultMetaFieldGenerator = new DefaultMetaFieldGeneration();
         this.DefaultServiceResolver = new DefaultServiceResolution();
+        this.DefaultAttributeExtractor = new AttributeExtractionService()
+        {
+            Extractors = new[]{
+                new DefaultAttributeExtractor()
+            }
+        };
     }
 
     // public async Task<IEnumerable<Field>> GenerateFieldsWithContext(Type formType, FormGenerationContext context)
@@ -185,7 +197,8 @@ public class FormEngineInstance
             MetaGenerator = formType.GetAttributeByInterface<IMetaFieldGenerator>() ?? this.DefaultMetaFieldGenerator,
             FieldConverter = formType.GetAttributeByInterface<IFieldConverter>() ?? this.DefaultFieldConverter,
             Processors = formType.GetAttributesByInterface<IFieldProcessor>(),
-            ServiceResolver = this.DefaultServiceResolver
+            ServiceResolver = this.DefaultServiceResolver,
+            AttributeExtractor = this.DefaultAttributeExtractor
         };
 
         var allProperties = formType.GetProperties();
