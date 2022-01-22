@@ -1,29 +1,21 @@
-using System;
 using System.Collections.Generic;
 using FormEngine.Attributes.Generators;
 using FormEngine.Attributes.Processors;
-using FormEngine.Services;
 
 namespace FormEngine;
 
-public class AsyncStringSource : Attribute, IDelegateHandler
+[Stepper("Enter Data", "Review Data")]
+public class RenderFieldsWithStepper
 {
-    public Delegate Handle => (Field field) =>
-    {
-        field.Name = "DelegateSource";
-    };
-}
-
-public class RenderFieldsWithAsyncSources
-{
-    [RenderMultiple(typeof(TextBoxAttribute), typeof(TextBoxAttribute))]
+    [Step(0)]
     public string FirstName { get; set; }
 
     [TextBox]
-    [AsyncStringSource]
+    [Step(0)]
     public string LastName { get; set; }
 
     [SelectBox]
+    [Step(1)]
     public bool Admin { get; set; }
 
     public static IEnumerable<Field> ExpectedResult = new[]{

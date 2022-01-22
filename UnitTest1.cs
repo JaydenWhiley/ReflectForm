@@ -75,4 +75,12 @@ public class FormGenerationTests
         var myFields = await myEngine.GetFields(typeof(RenderFieldsWithAsyncSources));
         AssertJson(RenderFieldsWithAsyncSources.ExpectedResult, myFields, true);
     }
+
+    [Fact]
+    public async Task CanRenderFieldsWithMultipleSteps()
+    {
+        FormEngineInstance myEngine = new FormEngineInstance();
+        var myFields = await myEngine.GetFields(typeof(RenderFieldsWithStepper));
+        AssertJson(RenderFieldsWithStepper.ExpectedResult, myFields, true);
+    }
 }
