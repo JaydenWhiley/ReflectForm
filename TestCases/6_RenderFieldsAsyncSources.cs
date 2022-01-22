@@ -3,33 +3,34 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FormEngine.Attributes.Generators;
 using FormEngine.Attributes.Processors;
+using FormEngine.Services;
 
 namespace FormEngine;
 
 
-public abstract class DelegateProcessor : Attribute, IFieldProcessor
-{
-    public abstract Delegate Handle { get; }
+// public abstract class DelegateProcessor : Attribute, IDelegateHandler
+// {
+//     public abstract Delegate Handle { get; }
 
-    public async Task ProcessFieldAsync(IFieldContext context)
-    {
-        var resolver = context.ServiceResolver;
-        var callData = new List<object>();
-        var handleParams = this.Handle.Method.GetParameters();
-        foreach (var parameter in handleParams)
-        {
-            var resolveResult = resolver.ResolveService(parameter.ParameterType);
-            var callDataEntry = resolveResult.Success ? resolveResult.Value : null;
-            callData.Add(callDataEntry);
-        }
-        var handleResult = this.Handle.DynamicInvoke(callData.ToArray());
-        if (handleResult is Task handleTask) await handleTask;
-    }
-}
+//     public async Task ProcessFieldAsync(IFieldContext context)
+//     {
+//         var resolver = context.ServiceResolver;
+//         var callData = new List<object>();
+//         var handleParams = this.Handle.Method.GetParameters();
+//         foreach (var parameter in handleParams)
+//         {
+//             var resolveResult = resolver.ResolveService(parameter.ParameterType);
+//             var callDataEntry = resolveResult.Success ? resolveResult.Value : null;
+//             callData.Add(callDataEntry);
+//         }
+//         var handleResult = this.Handle.DynamicInvoke(callData.ToArray());
+//         if (handleResult is Task handleTask) await handleTask;
+//     }
+// }
 
-public class AsyncStringSource : DelegateProcessor
+public class AsyncStringSource : Attribute, IDelegateHandler
 {
-    public override Delegate Handle => (Field field) =>
+    public Delegate Handle => (Field field) =>
     {
         field.Name = "DelegateSource";
     };

@@ -178,17 +178,12 @@ public class FormEngineInstance
         this.DefaultServiceResolver = new DefaultServiceResolution();
         this.DefaultAttributeExtractor = new AttributeExtractionService()
         {
-            Extractors = new[]{
-                new DefaultAttributeExtractor()
+            Extractors = new IAttributeExtractor[]{
+                new DefaultAttributeExtractor(),
+                new DelegateProcessorExtractor()
             }
         };
     }
-
-    // public async Task<IEnumerable<Field>> GenerateFieldsWithContext(Type formType, FormGenerationContext context)
-    // {
-    // }
-
-
 
     public async Task<IEnumerable<Field>> GetFields(Type formType)
     {
