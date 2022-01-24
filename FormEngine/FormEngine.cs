@@ -204,6 +204,10 @@ public class FormEngineInstance
             return fieldContext.MetaGenerator.GetMetaFields(x, fieldContext);
         });
 
+        var postProcessor = formType.GetAttributesByInterface<IMetaPostProcessor>();
+
+        // var processedMeta = postProcessor.Aggregate((proc, proc2) => proc(allMetaFields))
+
         var convertedFields = allMetaFields.Select(x => genContext.FieldConverter.ConvertToField(x, genContext));
 
         return await Task.WhenAll(convertedFields);
@@ -235,6 +239,7 @@ public class FormEngineInstance
 public class MetaField
 {
     public IEnumerable<IFieldProcessor> Processors { get; set; }
+    public IEnumerable<MetaField> Children { get; set; }
     public PropertyInfo PropInfo { get; set; }
     public bool Ignore { get; set; }
 }

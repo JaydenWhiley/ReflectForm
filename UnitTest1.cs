@@ -73,7 +73,7 @@ public class FormGenerationTests
     {
         FormEngineInstance myEngine = new FormEngineInstance();
         var myFields = await myEngine.GetFields(typeof(RenderFieldsWithAsyncSources));
-        AssertJson(RenderFieldsWithAsyncSources.ExpectedResult, myFields, true);
+        AssertJson(RenderFieldsWithAsyncSources.ExpectedResult, myFields);
     }
 
     [Fact]
