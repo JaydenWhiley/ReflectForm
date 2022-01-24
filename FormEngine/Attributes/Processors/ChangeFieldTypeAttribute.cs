@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace FormEngine.Attributes.Processors;
 
-public abstract class ChangeFieldTypeAttribute : FieldProcessorAttribute
+public class ChangeFieldTypeAttribute : FieldProcessorAttribute
 {
     public string FieldType { get; set; }
 

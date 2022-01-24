@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using FormEngine.Attributes.Processors;
 using FormEngine.Interfaces;
 using FormEngine.Services;
 
@@ -13,20 +14,60 @@ public interface IMetaFieldGenerator
     IEnumerable<MetaField> GetMetaFields(PropertyInfo info, FormGenerationContext context);
 }
 
+public interface IMetaFieldGeneratorService : IMetaFieldGenerator
+{
+    bool CanGenerate(PropertyInfo myType);
+}
+
 public interface IFieldConverter
 {
     Task<Field> ConvertToField(MetaField meta, FormGenerationContext context);
 }
 
-public class DefaultMetaFieldGeneration : IMetaFieldGenerator
+public class ObjectMetaFieldGeneration : IMetaFieldGeneratorService
 {
+    public bool CanGenerate(PropertyInfo property)
+    {
+        var (Name, propType) = (property.Name, property.PropertyType);
+        var validProperty = !propType.IsValueType && propType != typeof(string) && propType != typeof(string[]);
+        return validProperty;
+    }
+
     public IEnumerable<MetaField> GetMetaFields(PropertyInfo propInfo, FormGenerationContext context)
     {
+        var extractedProcessors = context.AttributeExtractor.GetAttributeServices<IFieldProcessor>(propInfo);
+        var objectProcessor = new ChangeFieldTypeAttribute("Object");
+
+        var myChildren = propInfo.PropertyType.GetProperties().SelectMany(childProp => context.MetaGenerator.GetMetaFields(childProp, context));
+        return new[]{
+            new MetaField(){
+                PropInfo = propInfo,
+                Children = myChildren,
+                Processors = context.Processors.Append(objectProcessor).Concat(extractedProcessors)
+            }
+        };
+    }
+}
+
+public class DefaultMetaFieldGeneration : IMetaFieldGenerator
+{
+    public DefaultMetaFieldGeneration()
+    {
+        this.Services = Enumerable.Empty<IMetaFieldGeneratorService>();
+    }
+
+    public IEnumerable<IMetaFieldGeneratorService> Services { get; set; }
+
+    public IEnumerable<MetaField> GetMetaFields(PropertyInfo propInfo, FormGenerationContext context)
+    {
+        var customService = this.Services.FirstOrDefault(x => x.CanGenerate(propInfo));
+        if (customService is not null) return customService.GetMetaFields(propInfo, context);
+
         var extractedProcessors = context.AttributeExtractor.GetAttributeServices<IFieldProcessor>(propInfo);
         return new[]{
                 new MetaField(){
                     PropInfo = propInfo,
-                    Processors = extractedProcessors.Concat(context.Processors)
+                    Processors = extractedProcessors.Concat(context.Processors),
                 }
             };
     }
@@ -36,10 +77,16 @@ public class DefaultFieldConversion : IFieldConverter
 {
     public async Task<Field> ConvertToField(MetaField meta, FormGenerationContext context)
     {
+        var fieldChildrenTasks = meta.Children.Select(x => this.ConvertToField(x, context));
+        var fieldChildren = await Task.WhenAll(fieldChildrenTasks);
+
+        // Console.WriteLine(string.Join(", ", meta.Children.Select(x => x.PropInfo.Name)));
+
         var myField = new Field()
         {
-            Name = meta.PropInfo.Name,
-            FieldType = meta.PropInfo.PropertyType.Name
+            Name = meta.PropInfo?.Name,
+            FieldType = meta.PropInfo?.PropertyType.Name,
+            Children = fieldChildren
         };
 
         var serviceContext = context.ServiceResolver.CreateContext();
@@ -47,7 +94,7 @@ public class DefaultFieldConversion : IFieldConverter
 
         var fieldContext = new FieldContext()
         {
-            PropInfo = meta.PropInfo,
+            PropInfo = meta?.PropInfo,
             CurrentField = myField,
             ServiceResolver = serviceContext
         };
@@ -174,7 +221,12 @@ public class FormEngineInstance
     public FormEngineInstance()
     {
         this.DefaultFieldConverter = new DefaultFieldConversion();
-        this.DefaultMetaFieldGenerator = new DefaultMetaFieldGeneration();
+        this.DefaultMetaFieldGenerator = new DefaultMetaFieldGeneration()
+        {
+            Services = new[]{
+               new ObjectMetaFieldGeneration()
+           }
+        };
         this.DefaultServiceResolver = new DefaultServiceResolution();
         this.DefaultAttributeExtractor = new AttributeExtractionService()
         {
@@ -183,6 +235,25 @@ public class FormEngineInstance
                 new DelegateProcessorExtractor()
             }
         };
+    }
+
+    public async Task<IEnumerable<Field>> GetFields(Type formType, FormGenerationContext genContext)
+    {
+        var allProperties = formType.GetProperties();
+
+        var allMetaFields = allProperties.SelectMany(x =>
+        {
+            var fieldContext = genContext.UpdateContext(x);
+            return fieldContext.MetaGenerator.GetMetaFields(x, fieldContext);
+        });
+        var postProcessor = formType.GetAttributesByInterface<IMetaPostProcessor>();
+        //Apply postProcessing
+        allMetaFields = postProcessor.Aggregate(allMetaFields, (fields, processor) => processor.ProcessMetaFields(fields, genContext));
+
+        var convertedFields = allMetaFields.Select(x => genContext.FieldConverter.ConvertToField(x, genContext));
+
+        return await Task.WhenAll(convertedFields);
+
     }
 
     public async Task<IEnumerable<Field>> GetFields(Type formType)
@@ -195,51 +266,32 @@ public class FormEngineInstance
             ServiceResolver = this.DefaultServiceResolver,
             AttributeExtractor = this.DefaultAttributeExtractor
         };
-
-        var allProperties = formType.GetProperties();
-
-        var allMetaFields = allProperties.SelectMany(x =>
-        {
-            var fieldContext = genContext.UpdateContext(x);
-            return fieldContext.MetaGenerator.GetMetaFields(x, fieldContext);
-        });
-
-        var postProcessor = formType.GetAttributesByInterface<IMetaPostProcessor>();
-
-        // var processedMeta = postProcessor.Aggregate((proc, proc2) => proc(allMetaFields))
-
-        var convertedFields = allMetaFields.Select(x => genContext.FieldConverter.ConvertToField(x, genContext));
-
-        return await Task.WhenAll(convertedFields);
-
-
-
-
-        //Generation
-        //multi Field
-        //RenderBefore / After
-
-        //Async Field Children??
-
-
-        //Field Converters (Default, Object, Array)
-
-        //get all the properties for the form
-
-        //Organise
-
-        //stepper
-        //Priority
-
-
-
+        return await this.GetFields(formType, genContext);
     }
 }
 
+//Generation
+//multi Field
+//RenderBefore / After
+
+//Async Field Children??
+
+
+//Field Converters (Default, Object, Array)
+
+//get all the properties for the form
+
+//Organise
+
+//stepper
+//Priority
+
 public class MetaField
 {
-    public IEnumerable<IFieldProcessor> Processors { get; set; }
-    public IEnumerable<MetaField> Children { get; set; }
+    public IEnumerable<IFieldProcessor> Processors { get; set; } = Enumerable.Empty<IFieldProcessor>();
+    public IEnumerable<MetaField> Children { get; set; } = Enumerable.Empty<MetaField>();
+
+    public FormGenerationContext Context { get; set; }
     public PropertyInfo PropInfo { get; set; }
     public bool Ignore { get; set; }
 }

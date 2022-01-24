@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FormEngine;
 
@@ -23,6 +24,7 @@ public class Field
     public Field()
     {
         this.FieldOptions = new List<FieldOption>();
+        this.Children = Enumerable.Empty<Field>();
     }
 
     public string Label { get; set; }

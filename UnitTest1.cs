@@ -83,4 +83,12 @@ public class FormGenerationTests
         var myFields = await myEngine.GetFields(typeof(RenderFieldsWithStepper));
         AssertJson(RenderFieldsWithStepper.ExpectedResult, myFields, true);
     }
+
+    [Fact]
+    public async Task CanRenderFieldWithObjectProperties()
+    {
+        FormEngineInstance myEngine = new FormEngineInstance();
+        var myFields = await myEngine.GetFields(typeof(RenderFieldsWithObjectPropertiesExample));
+        AssertJson(RenderFieldsWithObjectPropertiesExample.ExpectedResult, myFields, true);
+    }
 }

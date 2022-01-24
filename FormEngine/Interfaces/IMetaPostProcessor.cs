@@ -6,5 +6,5 @@ namespace FormEngine;
 
 public interface IMetaPostProcessor
 {
-    IEnumerable<MetaField> ProcessMetaFields(IEnumerable<MetaField> metaFields);
+    IEnumerable<MetaField> ProcessMetaFields(IEnumerable<MetaField> metaFields, FormGenerationContext context);
 }
